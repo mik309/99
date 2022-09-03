@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"api/99minutos/models"
 	"api/99minutos/db"
+	"api/99minutos/utils"
 	"time"
 	//"errors"
 	//"io/ioutil"
@@ -28,7 +29,21 @@ func ValidateCoord(coordinates string) bool {
 
 
 func CreateOrder(c *gin.Context){
-
+	email, password, hasAuth := c.Request.BasicAuth()
+	if hasAuth{
+		logged, _ := utils.LoginVerifier(email, password)
+		if logged == false{
+			c.JSON(404, gin.H{
+				"Error": "Cannot acces this information",
+			})
+			return 
+		}
+	}else{
+			c.JSON(404, gin.H{
+				"Error": "Cannot acces this information",
+			})
+			return
+		}
 	var order, last_order models.Order 
 	
 	err := c.BindJSON(&order)
@@ -67,7 +82,7 @@ func CreateOrder(c *gin.Context){
 		order.PackageSize = "L"
 	}else {
 		c.JSON(200, gin.H{
-			"Message": "El peso excede los 25 kilos, por lo que deberás comunicarte atención al cliente",
+			"Message": "El peso excede los 25 kilos, por lo que deberás comunicarte a atención al cliente",
 			"Total_weight" : total_weight,
 		})
 		return
@@ -86,12 +101,26 @@ func CreateOrder(c *gin.Context){
 	c.JSON(200, gin.H{
 		"Order": order,
 		"Total_weight" : total_weight,
-		"last" : last_id,
 	})
 	
 }
 
 func GetOrder(c *gin.Context){
+	email, password, hasAuth := c.Request.BasicAuth()
+	if hasAuth{
+		logged, _ := utils.LoginVerifier(email, password)
+		if logged == false{
+			c.JSON(404, gin.H{
+				"Error": "Cannot acces this information",
+			})
+			return 
+		}
+	}else{
+		c.JSON(404, gin.H{
+			"Error": "Cannot acces this information",
+		})
+		return
+	}
 	var order models.Order
 	db.DB.First(&order, c.Param("id"))
 	db.DB.Model(&order).Association("DestinationAddress").Find(&order.DestinationAddress)
@@ -124,6 +153,22 @@ func ValidStatus(status string) bool {
 
 func UpdateOrderStatus(c *gin.Context){
 	var order models.Order
+	email, password, hasAuth := c.Request.BasicAuth()
+	if hasAuth{
+		logged, user := utils.LoginVerifier(email, password)
+		if logged == false || user.IsAdmin == false{
+			c.JSON(401, gin.H{
+				"Error": "Cannot acces this information",
+			})
+			return 
+		}
+	}else{
+			c.JSON(401, gin.H{
+				"Error": "Cannot acces this information",
+			})
+			return
+	}
+
 	db.DB.First(&order, c.Param("id"))
 	db.DB.Model(&order).Association("DestinationAddress").Find(&order.DestinationAddress)
 	db.DB.Model(&order).Association("Products").Find(&order.Products)
@@ -135,14 +180,48 @@ func UpdateOrderStatus(c *gin.Context){
 			})
 			return
 		}else{
-			order.Status = new_status
-			order.UpdatedAt = time.Now()
-			db.DB.Save(&order)
-			c.JSON(404, gin.H{
-				"Order": order,
-			})
+			if new_status == "cancelado"{
+				currentTime := time.Now()
+				deltaTime := currentTime.Sub(order.CreatedAt)
+				if deltaTime <= time.Minute*2{
+					order.Status = new_status
+					order.Refund = true
+					order.UpdatedAt = time.Now()
+					db.DB.Save(&order)
+					c.JSON(200, gin.H{
+						"Order": order,
+						"refund" :true,
+						"Message": "La orden cumple para el reembolso",
+					})
+					return
+				}else{
+					order.Status = new_status
+					order.Refund = true
+					order.UpdatedAt = time.Now()
+					db.DB.Save(&order)
+					c.JSON(200, gin.H{
+						"Order": order,
+						"Refund": false,
+						"Message": "La orden no cumple para el reembolso",
+					})
+					return
+				}				
+			}else{
+				order.Status = new_status
+				order.Refund = false
+				order.UpdatedAt = time.Now()
+				c.JSON(200, gin.H{
+					"Order": order,
+				})
+				return
+			}
+
 		}
+	}else{
+		c.JSON(400, gin.H{
+			"Error": "This status is not valid",
+			"Status" : new_status,
+		})
+		return
 	}
-	
-	order.Status = new_status
 }
