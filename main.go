@@ -1,9 +1,7 @@
 package main
 
 import ( 
-	//"net/http"
 	"github.com/gin-gonic/gin"
-	//"errors"
 	"api/99minutos/routes"
 	"api/99minutos/db"
 	"api/99minutos/models"
@@ -22,11 +20,11 @@ func main(){
   	if err != nil {
     	log.Fatal(err)
   	}
-	host := os.Getenv("HOST")
-	user := os.Getenv("USER")
-	password := os.Getenv("PASSWORD")
+	host := os.Getenv("DBHOST")
+	user := os.Getenv("DBUSER")
+	password := os.Getenv("DBPASSWORD")
 	dbname := os.Getenv("DBNAME")
-	port := os.Getenv("PORT")
+	port := os.Getenv("DBPORT")
 
 	db.Connection(host,user,password,dbname,port)
 	//Order migrations
@@ -42,7 +40,6 @@ func main(){
 	
 	//Users
 	r.POST("/users/create", routes.CreateUserHandler)
-	//r.GET("/users/login", routes.LoginHandler)
 	r.Run()
 }
 

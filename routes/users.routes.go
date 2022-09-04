@@ -32,7 +32,6 @@ func CreateUserHandler(c *gin.Context){
 
 	c.JSON(200, gin.H{
 		"message": "Account Created Succesfully",
-		//"user" : user,
 	})
 }
 

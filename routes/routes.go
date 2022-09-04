@@ -1,7 +1,6 @@
 package routes
 
 import ( 
-	//"net/http"
 	"github.com/gin-gonic/gin"
 	"strings"
 	"strconv"
@@ -9,8 +8,6 @@ import (
 	"api/99minutos/db"
 	"api/99minutos/utils"
 	"time"
-	//"errors"
-	//"io/ioutil"
 )
 
 
@@ -196,7 +193,7 @@ func UpdateOrderStatus(c *gin.Context){
 					return
 				}else{
 					order.Status = new_status
-					order.Refund = true
+					order.Refund = false
 					order.UpdatedAt = time.Now()
 					db.DB.Save(&order)
 					c.JSON(200, gin.H{
