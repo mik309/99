@@ -26,9 +26,11 @@ func ValidateCoord(coordinates string) bool {
 
 
 func CreateOrder(c *gin.Context){
+	var user models.User
+	var logged bool
 	email, password, hasAuth := c.Request.BasicAuth()
 	if hasAuth{
-		logged, _ := utils.LoginVerifier(email, password)
+		logged, user = utils.LoginVerifier(email, password)
 		if logged == false{
 			c.JSON(404, gin.H{
 				"Error": "Cannot acces this information",
@@ -70,14 +72,20 @@ func CreateOrder(c *gin.Context){
 		order.Products[i].OrderID = last_id + 1
 		total_weight += products[i].Weight
 	}
-
-	if total_weight <= 5{
+	switch {
+	case total_weight <= 5:
 		order.PackageSize = "S"
-	}else if total_weight <= 15{
+		break
+	case total_weight <= 15:
 		order.PackageSize = "M"
-	}else if total_weight <= 25{
+		break
+	case total_weight <= 25:
 		order.PackageSize = "L"
-	}else {
+		break
+	case total_weight > 25 && user.XlEnabled == true:
+		order.PackageSize = "XL"
+		break
+	default:
 		c.JSON(200, gin.H{
 			"Message": "El peso excede los 25 kilos, por lo que deberás comunicarte a atención al cliente",
 			"Total_weight" : total_weight,
@@ -171,11 +179,15 @@ func UpdateOrderStatus(c *gin.Context){
 	db.DB.Model(&order).Association("Products").Find(&order.Products)
 	new_status := c.Param("new_status")
 	if ValidStatus(new_status){
-		if new_status == "cancelado" && (order.Status == "en_ruta" || order.Status == "entregada"){
+		if (new_status == "cancelado" && order.Status == "en_ruta") || (new_status == "cancelado"  && order.Status == "entregado"){
 			c.JSON(404, gin.H{
 				"Error": "No se puede cancelar una orden en ruta o entregada",
 			})
 			return
+		}else if order.Status == "cancelado" && new_status != "cancelado"{
+			c.JSON(404, gin.H{
+				"Error" : "No se puede modificar una orden cancelada",
+			})
 		}else{
 			if new_status == "cancelado"{
 				currentTime := time.Now()
@@ -207,6 +219,7 @@ func UpdateOrderStatus(c *gin.Context){
 				order.Status = new_status
 				order.Refund = false
 				order.UpdatedAt = time.Now()
+				db.DB.Save(&order)
 				c.JSON(200, gin.H{
 					"Order": order,
 				})
